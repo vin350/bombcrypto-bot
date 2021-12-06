@@ -291,12 +291,10 @@ def findPuzzlePieces(result, piece_img, threshold=0.5):
     piece_h = piece_img.shape[0]
     yloc, xloc = np.where(result >= threshold)
 
-
     r= []
     for (piece_x, piece_y) in zip(xloc, yloc):
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
-
 
     r, weights = cv2.groupRectangles(r, 1, 0.2)
 
@@ -525,13 +523,15 @@ def clickGreenBarButtons():
     green_bars = positions(green_bar, threshold=ct['green_bar'])
     buttons = positions(go_work_img, threshold=ct['go_to_work_btn'], return_0=True)
 
+    if green_bars is False:
+        return False
+
     if c['debug'] is not False:
         logger('%d green bars detected' % len(green_bars))
         logger('%d buttons detected' % len(buttons))
 
     not_working_green_bars = []
-    if green_bars is False:
-        return False
+    
     for bar in green_bars:
         if not isWorking(bar, buttons):
             not_working_green_bars.append(bar)
@@ -709,6 +709,8 @@ def handle_error():
         login()
 
 def refreshHeroes():
+    logger('Sending heroes to work.', telegram=True)
+    
     goToHeroes()
 
     if c['select_heroes_mode'] == "full":
