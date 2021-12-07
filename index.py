@@ -11,6 +11,7 @@ import sys
 import yaml
 import random
 import requests
+import updater
 
 # TODO: add kill bot on button pressed, server maintenance, auto update com os valores anteriores da config
 
@@ -37,8 +38,9 @@ banner = """
 
 print(banner)
 
-stream = open("config.yaml", 'r')
-if stream is not None:
+if updater.ConfigChecker.isConfigComplete():
+    # config is complete, get all data from config
+    stream = open("config.yaml", 'r')
     c = yaml.safe_load(stream)
     ct = c['threshold']
     t = c['time_intervals']
@@ -48,10 +50,17 @@ if stream is not None:
     offsets = c['offsets']
     stream.close()
 else:
-    logger("Config file not found. Exiting.")
-    time.sleep(3)
-    exit()
-
+    # check what is missing
+    missing_config = updater.ConfigChecker.checkConfig()
+    if missing_config == "EMPTY":
+        logger("Config file not found. Exiting.")
+        time.sleep(3)
+        exit()
+    else:
+        # file exists but is incomplete, check and notify user
+        logger(f"You must enter a valid value for {updater.ConfigChecker.checkConfig()} in the configuration files")
+        time.sleep(3)
+        exit()
 hc = HumanClicker()
 pyautogui.PAUSE = c['time_intervals']['interval_between_movements']
 pyautogui.FAILSAFE = False
@@ -91,6 +100,7 @@ chest1 = cv2.imread('images/targets/chest1.png')
 chest2 = cv2.imread('images/targets/chest2.png')
 chest3 = cv2.imread('images/targets/chest3.png')
 chest4 = cv2.imread('images/targets/chest4.png')
+
 
 def logger(message, telegram=False):
     datetime = time.localtime()
@@ -152,21 +162,32 @@ if telegram_data['telegram_mode'] == True:
     except:
         logger("Bot not initialized! See configuration file.")
 
+
 def sendTelegramMessage(message):
-    if telegram_data['telegram_mode'] == False:
+    """
+    Send a message to telegram
+    :param message: The message that will be sent
+    """
+
+    if not telegram_data['telegram_mode']:
         return
     try:
-        if(len(telegram_data["telegram_chat_id"]) > 0):
+        if len(telegram_data["telegram_chat_id"]) > 0:
             for chat_id in telegram_data["telegram_chat_id"]:
                 TBot.send_message(text=message, chat_id=chat_id)
     except:
         logger("Unable to send telegram message. See configuration file.")
 
+
 def sendTelegramPrint():
-    if telegram_data['telegram_mode'] == False:
+    """
+    Sends the current state of the game as a screenshot to telegram
+    """
+
+    if not telegram_data['telegram_mode']:
         return
     try:
-        if(len(telegram_data["telegram_chat_id"]) > 0):
+        if len(telegram_data["telegram_chat_id"]) > 0:
             screenshot = printScreen()
             cv2.imwrite('./logs/print-report.%s' % telegram_data["format_of_images"], screenshot)
             for chat_id in telegram_data["telegram_chat_id"]:
@@ -174,8 +195,12 @@ def sendTelegramPrint():
     except:
         logger("Unable to send telegram message. See configuration file.")
 
+
 def sendPossibleAmountReport(baseImage):
-    if telegram_data['telegram_mode'] == False:
+    """Send the possible amount of coins that can be gathered in the current map
+    :param baseImage: The base image of the map
+    """
+    if not telegram_data['telegram_mode']:
         return
     c1 = len(positions(chest1, ct['chest'], baseImage, True))
     c2 = len(positions(chest2, ct['chest'], baseImage, True))
@@ -200,10 +225,14 @@ Possible amount : """+f'{total:.3f} BCoin'+"""
 
     logger(report, telegram=True)
 
+
 def sendBCoinReport():
-    if telegram_data['telegram_mode'] == False:
+    """Send the current amount of BCoin in the game to telegram
+    """
+
+    if not telegram_data['telegram_mode']:
         return
-    if(len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_coin_report"] is False):
+    if len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_coin_report"] is False:
         return
 
     if current_screen() == "main":
@@ -242,10 +271,13 @@ def sendBCoinReport():
     logger("BCoin Report sent.", telegram=True)
     return True
 
+
 def sendMapReport():
-    if telegram_data['telegram_mode'] == False:
+    """Send the current map to telegram
+    """
+    if not telegram_data['telegram_mode']:
         return
-    if(len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_map_report"] is False):
+    if len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_map_report"] is False:
         return
 
     if current_screen() == "main":
@@ -295,7 +327,8 @@ def sendMapReport():
     logger("Map Report sent.", telegram=True)
     return True
 
-def clickBtn(img,name=None, timeout=3, threshold = ct['default']):
+
+def clickBtn(img, name=None, timeout=3, threshold=ct['default']):
     if not name is None:
         pass
     start = time.time()
@@ -312,7 +345,7 @@ def clickBtn(img,name=None, timeout=3, threshold = ct['default']):
             # print('button not found yet')
             continue
 
-        x,y,w,h = matches[0]
+        x, y, w, h = matches[0]
         # pyautogui.moveTo(x+(w/2),y+(h/2),1)
         # pyautogui.moveTo(int(random.uniform(x, x+w)),int(random.uniform(y, y+h)),1)
         hc.move((int(random.uniform(x, x+w)), int(random.uniform(y, y+h))),1)
@@ -320,11 +353,16 @@ def clickBtn(img,name=None, timeout=3, threshold = ct['default']):
         return True
 
 def printScreen():
+    """Takes a screenshot
+    :return: The screenshot as a np.array
+    """
+
     with mss.mss() as sct:
         # The screen part to capture
         # Grab the data
         sct_img = np.array(sct.grab(sct.monitors[c['monitor_to_use']]))
-        return sct_img[:,:,:3]
+        return sct_img[:, :, :3]
+
 
 def positions(target, threshold=ct['default'], base_img=None, return_0=False):
     if base_img is None:
@@ -355,6 +393,7 @@ def positions(target, threshold=ct['default'], base_img=None, return_0=False):
     else:
         return rectangles
 
+
 def findPuzzlePieces(result, piece_img, threshold=0.5):
     piece_w = piece_img.shape[1]
     piece_h = piece_img.shape[0]
@@ -382,6 +421,7 @@ def findPuzzlePieces(result, piece_img, threshold=0.5):
 
         return r
 
+
 def getRightPiece(puzzle_pieces):
     if puzzle_pieces is False:
         return False
@@ -392,6 +432,7 @@ def getRightPiece(puzzle_pieces):
     right_piece = puzzle_pieces[index_of_right_rectangle]
     return right_piece
 
+
 def getLeftPiece(puzzle_pieces):
     if puzzle_pieces is False:
         return False
@@ -401,6 +442,7 @@ def getLeftPiece(puzzle_pieces):
 
     left_piece = puzzle_pieces[index_of_left_rectangle]
     return left_piece
+
 
 def show(rectangles = None, img = None):
 
@@ -415,6 +457,7 @@ def show(rectangles = None, img = None):
     # cv2.rectangle(img, (result[0], result[1]), (result[0] + result[2], result[1] + result[3]), (255,50,255), 2)
     cv2.imshow('img',img)
     cv2.waitKey(0)
+
 
 def getPiecesPosition(t = 150):
     popup_pos = positions(robot)
@@ -466,6 +509,7 @@ def getPiecesPosition(t = 150):
     # show(absolute_puzzle_pieces)
     return absolute_puzzle_pieces
 
+
 def getSliderPosition():
     slider_pos = positions(slider)
     if slider_pos is False:
@@ -474,12 +518,14 @@ def getSliderPosition():
     position = [x+w/2,y+h/2]
     return position
 
+
 def check_puzzle():
     puzzle_pos = positions(robot)
     if puzzle_pos is not False:
         solveCaptcha()
     else:
         return True
+
 
 def solveCaptcha():
     pieces_start_pos = getPiecesPosition()
@@ -538,6 +584,7 @@ def solveCaptcha():
 
     # show(arr)
 
+
 def scroll():
     offset = offsets['character_indicator']
     offset_random = random.uniform(offset[0], offset[1])
@@ -559,6 +606,7 @@ def scroll():
         pyautogui.mouseDown(button='left')
         hc.move((int(x),int(y+(-c['click_and_drag_amount']))), np.random.randint(1,2))
         pyautogui.mouseUp(button='left')
+
 
 def clickButtons():
     buttons = positions(go_work_img, threshold=ct['go_to_work_btn'])
@@ -585,6 +633,7 @@ def clickButtons():
     logger('Clicking in %d heroes detected.' % len(buttons), telegram=True)
     return len(buttons)
 
+
 def isWorking(bar, buttons):
     y = bar[1]
 
@@ -594,6 +643,7 @@ def isWorking(bar, buttons):
         if isBelow and isAbove:
             return False
     return True
+
 
 def clickGreenBarButtons():
     offset = offsets['work_button']
@@ -630,6 +680,7 @@ def clickGreenBarButtons():
         sleep(1, 3)
     return len(not_working_green_bars)
 
+
 def clickFullBarButtons():
     offset = offsets['work_button_full']
     full_bars = positions(full_stamina, threshold=ct['full_bar'])
@@ -663,6 +714,7 @@ def clickFullBarButtons():
         sleep(1, 3)
     return len(not_working_full_bars)
 
+
 def current_screen():
     if positions(arrow_img) is not False:
         # sys.stdout.write("\nThunt. ")
@@ -680,6 +732,7 @@ def current_screen():
         # sys.stdout.write("\nUnknown. ")
         return "unknown"
 
+
 def goToHeroes():
     if current_screen() == "thunt":
         if clickBtn(arrow_img):
@@ -696,6 +749,7 @@ def goToHeroes():
     if current_screen() == "unknown" or current_screen() == "login":
         check_for_logout()
 
+
 def goToGame():
     if current_screen() == "main":
         clickBtn(teasureHunt_icon_img)
@@ -705,6 +759,7 @@ def goToGame():
             clickBtn(teasureHunt_icon_img)
     if current_screen() == "unknown" or current_screen() == "login":
         check_for_logout()
+
 
 def refreshHeroesPositions():
     logger("Refreshing heroes Positions.")
@@ -720,6 +775,7 @@ def refreshHeroesPositions():
             return False
     else:
         return False
+
 
 def login():
     global login_attempts
@@ -775,6 +831,7 @@ def login():
 
     handle_error()
 
+
 def handle_error():
     if positions(error_img, ct['error']) is not False:
         sendTelegramPrint()
@@ -786,6 +843,7 @@ def handle_error():
         login()
     else:
         return False
+
 
 def refreshHeroes():
     goToHeroes()
@@ -817,6 +875,7 @@ def refreshHeroes():
     logger('{} total heroes sent since the bot started'.format(hero_clicks), telegram=True)
     goToGame()
 
+
 def check_for_logout():
     if current_screen() == "unknown" or current_screen() == "login":
         if positions(connect_wallet_btn_img) is not False:
@@ -836,6 +895,7 @@ def check_for_logout():
             
     else:
         return False
+
 
 def waitForImg(imgs, timeout=30, threshold=0.5, multiple=False):
     start = time.time()
@@ -858,16 +918,19 @@ def waitForImg(imgs, timeout=30, threshold=0.5, multiple=False):
                 continue
             return True
 
+
 def sleep(min, max):
-	sleep = random.uniform(min,max)
-	randomMouseMovement()
-	return time.sleep(sleep)
+    sleep = random.uniform(min,max)
+    randomMouseMovement()
+    return time.sleep(sleep)
+
 
 def randomMouseMovement():
     x, y = pyautogui.size()
     x = np.random.randint(0, x)
     y = np.random.randint(0, y)
     hc.move((int(x), int(y)), np.random.randint(1,3))
+
 
 def check_updates():
     data = requests.get('https://raw.githubusercontent.com/vin350/bombcrypto-bot/main/config.yaml')
