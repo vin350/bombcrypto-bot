@@ -23,6 +23,7 @@ class ConfigChecker:
             filevalue = config[essentialconfig['main']][essentialconfig['secondary']]
             # check if its an list
 
+        stream.close()
 
     @staticmethod
     def isConfigComplete() -> bool:
@@ -50,12 +51,17 @@ class ConfigChecker:
                 else:
                     if filevalue == essentialconfig['keyword']:
                         return False
+            stream.close()
         else:
             return False
         return True
 
+    @staticmethod
+    def checkConfigVersion() -> :
 
 class ConfigProperties(Enum):
+    """An enumeration of all the config properties that must be filled correctly by the user"""
+
     telegram_id = {
         'isArray': True,
         'main': "telegram",
@@ -71,9 +77,25 @@ class ConfigProperties(Enum):
         'propertyName': 'Telegram Key/Token'
     }
     metamask_pwd = {
-        'isArray':False,
+        'isArray': False,
         'main': "metamask",
         'secondary': 'password',
         'keyword': '<METAMASK PASSWORD>',
         'propertyName': 'Metamask Password'
     }
+
+class Version:
+    """A class that represents the version of the software"""
+    major:int
+    minor:int
+    patch:int
+    def __init__(self, major: int, minor: int, patch: int):
+        self.major = major
+        self.minor = minor
+        self.patch = patch
+
+    def Parse(self, version: str):
+        versions = version.split('.')
+        self.major = int(versions[0])
+        self.minor = int(versions[1])
+        self.patch = int(versions[2])
