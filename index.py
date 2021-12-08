@@ -4,6 +4,7 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 
 from src.date import dateFormatted
+from src.images import Targets
 
 import numpy as np
 import mss
@@ -89,35 +90,6 @@ login_attempts = 0
 next_refresh_heroes = t['send_heroes_for_work'][0]
 next_refresh_heroes_positions = t['refresh_heroes_positions'][0]
 
-go_work_img = cv2.imread('./images/targets/go-work.png')
-home_img = cv2.imread('./images/targets/home.png')
-arrow_img = cv2.imread('./images/targets/go-back-arrow.png')
-full_screen_img = cv2.imread('./images/targets/full_screen.png')
-hero_img = cv2.imread('./images/targets/hero-icon.png')
-x_button_img = cv2.imread('./images/targets/x.png')
-teasureHunt_icon_img = cv2.imread('./images/targets/treasure-hunt-icon.png')
-ok_btn_img = cv2.imread('./images/targets/ok.png')
-connect_wallet_btn_img = cv2.imread('./images/targets/connect-wallet.png')
-sign_btn_img = cv2.imread('./images/targets/metamask_sign.png')
-new_map_btn_img = cv2.imread('./images/targets/new-map.png')
-green_bar = cv2.imread('./images/targets/green-bar.png')
-full_stamina = cv2.imread('./images/targets/full-stamina.png')
-character_indicator = cv2.imread('./images/targets/character_indicator.png')
-error_img = cv2.imread('./images/targets/error.png')
-metamask_unlock_img = cv2.imread('./images/targets/unlock_metamask.png')
-metamask_cancel_button = cv2.imread('./images/targets/metamask_cancel_button.png')
-puzzle_img = cv2.imread('./images/targets/puzzle.png')
-piece = cv2.imread('./images/targets/piece.png')
-robot = cv2.imread('./images/targets/robot.png')
-slider = cv2.imread('./images/targets/slider.png')
-chest_button = cv2.imread('./images/targets/treasure_chest.png')
-coin_icon = cv2.imread('./images/targets/coin.png')
-maintenance_popup = cv2.imread('./images/targets/maintenance.png')
-chest1 = cv2.imread('./images/targets/chest1.png')
-chest2 = cv2.imread('./images/targets/chest2.png')
-chest3 = cv2.imread('./images/targets/chest3.png')
-chest4 = cv2.imread('./images/targets/chest4.png')
-
 # Initialize telegram
 if telegram_data['telegram_mode'] == True:
     logger('Initializing Telegram...', emoji='📱')
@@ -185,10 +157,10 @@ def sendTelegramPrint():
 def sendPossibleAmountReport(baseImage):
     if telegram_data['telegram_mode'] == False:
         return
-    c1 = len(positions(chest1, ct['chest'], baseImage, True))
-    c2 = len(positions(chest2, ct['chest'], baseImage, True))
-    c3 = len(positions(chest3, ct['chest'], baseImage, True))
-    c4 = len(positions(chest4, ct['chest'], baseImage, True))
+    c1 = len(positions(Targets.chest1, ct['chest'], baseImage, True))
+    c2 = len(positions(Targets.chest2, ct['chest'], baseImage, True))
+    c3 = len(positions(Targets.chest3, ct['chest'], baseImage, True))
+    c4 = len(positions(Targets.chest4, ct['chest'], baseImage, True))
     
     value1 = c1 * chest_data["value_chest1"]
     value2 = c2 * chest_data["value_chest2"]
@@ -215,23 +187,23 @@ def sendBCoinReport():
         return
 
     if currentScreen() == "main":
-        if clickButton(teasureHunt_icon_img):
+        if clickButton(Targets.treasure_hunt_banner):
             time.sleep(2)
     elif currentScreen() == "character":
-        if clickButton(x_button_img):
+        if clickButton(Targets.x_button):
             time.sleep(2)
-            if clickButton(teasureHunt_icon_img):
+            if clickButton(Targets.treasure_hunt_banner):
                 time.sleep(2)
     elif currentScreen() == "thunt":
         time.sleep(2)
     else:
         return
         
-    clickButton(chest_button)
+    clickButton(Targets.treasure_chest_button)
 
     sleep(5, 15)
 
-    coin = positions(coin_icon, return_0=True)
+    coin = positions(Targets.coin_rewards, return_0=True)
     if len(coin) > 0:
         x, y, w, h = coin[0]
 
@@ -246,7 +218,7 @@ def sendBCoinReport():
                     TBot.send_photo(chat_id=chat_id, photo=open('./logs/bcoin-report.%s' % telegram_data["format_of_images"], 'rb'))
             except:
                 logger('Telegram offline', emoji='😿')
-    clickButton(x_button_img)
+    clickButton(Targets.x_button)
     logger('BCoin report sent', telegram=True, emoji='📄')
     return True
 
@@ -257,20 +229,20 @@ def sendMapReport():
         return
 
     if currentScreen() == "main":
-        if clickButton(teasureHunt_icon_img):
+        if clickButton(Targets.treasure_hunt_banner):
             time.sleep(2)
     elif currentScreen() == "character":
-        if clickButton(x_button_img):
+        if clickButton(Targets.x_button):
             time.sleep(2)
-            if clickButton(teasureHunt_icon_img):
+            if clickButton(Targets.treasure_hunt_banner):
                 time.sleep(2)
     elif currentScreen() == "thunt":
         time.sleep(2)
     else:
         return
 
-    back = positions(arrow_img, return_0=True)
-    full_screen = positions(full_screen_img, return_0=True)
+    back = positions(Targets.go_back_arrow_button, return_0=True)
+    full_screen = positions(Targets.full_screen_button, return_0=True)
     if len(back) <= 0 or len(full_screen) <= 0:
         return
     x, y, _, _ = back[0]
@@ -299,11 +271,11 @@ def sendMapReport():
         except:
             logger('Error finding chests', telegram=True, emoji='😿')
 
-    clickButton(x_button_img)
+    clickButton(Targets.x_button)
     logger('Map report sent', telegram=True, emoji='📄')
     return True
 
-def clickButton(img,name=None, timeout=3, threshold = ct['default']):
+def clickButton(img, name=None, timeout=3, threshold = ct['default']):
     if not name is None:
         pass
     start = time.time()
@@ -368,12 +340,10 @@ def findPuzzlePieces(result, piece_img, threshold=0.5):
     piece_h = piece_img.shape[0]
     yloc, xloc = np.where(result >= threshold)
 
-
     r= []
     for (piece_x, piece_y) in zip(xloc, yloc):
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
-
 
     r, weights = cv2.groupRectangles(r, 1, 0.2)
 
@@ -425,7 +395,7 @@ def show(rectangles = None, img = None):
     cv2.waitKey(0)
 
 def getPiecesPosition(t = 150):
-    popup_pos = positions(robot)
+    popup_pos = positions(Targets.robot)
     if popup_pos is False:
         logger('Captcha not found', emoji='🧩')
         return
@@ -447,8 +417,8 @@ def getPiecesPosition(t = 150):
     edges = cv2.Canny(blurred, threshold1=t/2, threshold2=t,L2gradient=True)
     # img = cv2.Laplacian(img,cv2.CV_64F)
 
-    # gray_piece_img = cv2.cvtColor(piece, cv2.COLOR_BGR2GRAY)
-    piece_img = cv2.cvtColor(piece, cv2.COLOR_BGR2GRAY)
+    # gray_piece_img = cv2.cvtColor(Targets.piece, cv2.COLOR_BGR2GRAY)
+    piece_img = cv2.cvtColor(Targets.piece, cv2.COLOR_BGR2GRAY)
     # print('----')
     # print(piece_img.shape)
     # print(edges.shape)
@@ -475,7 +445,7 @@ def getPiecesPosition(t = 150):
     return absolute_puzzle_pieces
 
 def getSliderPosition():
-    slider_pos = positions(slider)
+    slider_pos = positions(Targets.slider)
     if slider_pos is False:
         return False
     x, y, w, h = slider_pos[0]
@@ -483,7 +453,7 @@ def getSliderPosition():
     return position
 
 def checkCaptcha():
-    puzzle_pos = positions(robot)
+    puzzle_pos = positions(Targets.robot)
     if puzzle_pos is not False:
         solveCaptcha()
     else:
@@ -536,7 +506,7 @@ def solveCaptcha():
     pyautogui.mouseUp()
     time.sleep(2)
 
-    puzzle_pos = positions(robot)
+    puzzle_pos = positions(Targets.robot)
     if puzzle_pos is not False:
         logger('Captcha error', emoji='🧩')
         solveCaptcha()
@@ -551,7 +521,7 @@ def scroll():
     
     # width, height = pyautogui.size()
     # pyautogui.moveTo(width/2-200, height/2,1)
-    character_indicator_pos = positions(character_indicator)
+    character_indicator_pos = positions(Targets.character_indicator)
     if character_indicator_pos is False:
         return
 
@@ -568,7 +538,7 @@ def scroll():
         pyautogui.mouseUp(button='left')
 
 def clickButtons():
-    buttons = positions(go_work_img, threshold=ct['go_to_work_btn'])
+    buttons = positions(Targets.go_work_button, threshold=ct['go_to_work_btn'])
     offset = offsets['work_button_all']
 
     if buttons is False:
@@ -605,8 +575,8 @@ def isWorking(bar, buttons):
 
 def clickGreenBarButtons():
     offset = offsets['work_button']
-    green_bars = positions(green_bar, threshold=ct['green_bar'])
-    buttons = positions(go_work_img, threshold=ct['go_to_work_btn'])
+    green_bars = positions(Targets.green_bar, threshold=ct['green_bar'])
+    buttons = positions(Targets.go_work_button, threshold=ct['go_to_work_btn'])
 
     if green_bars is False or buttons is False:
         return
@@ -641,8 +611,8 @@ def clickGreenBarButtons():
 
 def clickFullBarButtons():
     offset = offsets['work_button_full']
-    full_bars = positions(full_stamina, threshold=ct['full_bar'])
-    buttons = positions(go_work_img, threshold=ct['go_to_work_btn'])
+    full_bars = positions(Targets.full_stamina, threshold=ct['full_bar'])
+    buttons = positions(Targets.go_work_button, threshold=ct['go_to_work_btn'])
 
     if full_bars is False or buttons is False:
         return
@@ -674,16 +644,16 @@ def clickFullBarButtons():
     return len(not_working_full_bars)
 
 def currentScreen():
-    if positions(arrow_img) is not False:
+    if positions(Targets.go_back_arrow_button) is not False:
         # sys.stdout.write("\nThunt. ")
         return "thunt"
-    elif positions(teasureHunt_icon_img) is not False:
+    elif positions(Targets.treasure_hunt_banner) is not False:
         # sys.stdout.write("\nmain. ")
         return "main"
-    elif positions(connect_wallet_btn_img) is not False:
+    elif positions(Targets.connect_wallet_button) is not False:
         # sys.stdout.write("\nlogin. ")
         return "login"
-    elif positions(character_indicator) is not False:
+    elif positions(Targets.character_indicator) is not False:
         # sys.stdout.write("\ncharacter. ")
         return "character"
     else:
@@ -692,27 +662,27 @@ def currentScreen():
 
 def goToHeroes():
     if currentScreen() == "thunt":
-        if clickButton(arrow_img):
+        if clickButton(Targets.go_back_arrow_button):
             sleep(1, 3)
-            if clickButton(hero_img):
+            if clickButton(Targets.hero_icon):
                 sleep(1, 3)
                 checkCaptcha()
-                waitForImage(home_img)
+                waitForImage(Targets.home_button)
     if currentScreen() == "main":
-        if clickButton(hero_img):
+        if clickButton(Targets.hero_icon):
             sleep(1, 3)
             checkCaptcha()
-            waitForImage(home_img)
+            waitForImage(Targets.home_button)
     if currentScreen() == "unknown" or currentScreen() == "login":
         checkLogout()
 
 def goToTreasureHunt():
     if currentScreen() == "main":
-        clickButton(teasureHunt_icon_img)
+        clickButton(Targets.treasure_hunt_banner)
     if currentScreen() == "character":
-        if clickButton(x_button_img):
+        if clickButton(Targets.x_button):
             sleep(1, 3)
-            clickButton(teasureHunt_icon_img)
+            clickButton(Targets.treasure_hunt_banner)
     if currentScreen() == "unknown" or currentScreen() == "login":
         checkLogout()
 
@@ -721,10 +691,10 @@ def refreshHeroesPositions():
     global next_refresh_heroes_positions
     next_refresh_heroes_positions = random.uniform(t['refresh_heroes_positions'][0], t['refresh_heroes_positions'][1])
     if currentScreen() == "thunt":
-        if clickButton(arrow_img):
+        if clickButton(Targets.go_back_arrow_button):
             time.sleep(5)
     if currentScreen() == "main":
-        if clickButton(teasureHunt_icon_img):
+        if clickButton(Targets.treasure_hunt_banner):
             return True
         else:
             return False
@@ -736,13 +706,13 @@ def login():
 
     randomMouseMovement()
 
-    if clickButton(connect_wallet_btn_img):
+    if clickButton(Targets.connect_wallet_button):
         logger('Connect wallet button detected, logging in!', emoji='🎉')
         time.sleep(2)
         solveCaptcha()
-        waitForImage((sign_btn_img, metamask_unlock_img), multiple=True)
+        waitForImage((Targets.metamask_sign_button, Targets.metamask_unlock), multiple=True)
 
-    metamask_unlock_coord = positions(metamask_unlock_img)
+    metamask_unlock_coord = positions(Targets.metamask_unlock)
     if metamask_unlock_coord is not False:
         if(metamask_data["enable_login_metamask"] is False):
             logger('Metamask locked! But login with password is disabled, exiting', emoji='🔒')
@@ -751,16 +721,16 @@ def login():
         password = metamask_data["password"]
         pyautogui.typewrite(password, interval=0.1)
         sleep(1, 3)
-        if clickButton(metamask_unlock_img):
+        if clickButton(Targets.metamask_unlock):
             logger('Unlock button clicked', emoji='🔓')
 
-    if clickButton(sign_btn_img):
+    if clickButton(Targets.metamask_sign_button):
         logger('Found sign button. Waiting to check if logged in', emoji='✔️')
         time.sleep(5)
-        if clickButton(sign_btn_img): ## twice because metamask glitch
+        if clickButton(Targets.metamask_sign_button): ## twice because metamask glitch
             logger('Found glitched sign button. Waiting to check if logged in', emoji='✔️')
         # time.sleep(25)
-        waitForImage(teasureHunt_icon_img, timeout=60)
+        waitForImage(Targets.treasure_hunt_banner, timeout=60)
 
     if currentScreen() == "main":
         logger('Logged in', telegram=True, emoji='🎉')
@@ -772,28 +742,26 @@ def login():
         if (login_attempts > 3):
             sendTelegramPrint()
             logger('+3 login attempts, retrying', telegram=True, emoji='🔃')
-            # pyautogui.hotkey('ctrl', 'f5')
             pyautogui.hotkey('ctrl', 'shift', 'r')
             login_attempts = 0
 
-            if clickButton(metamask_cancel_button):
+            if clickButton(Targets.metamask_cancel_button):
                 logger('Metamask is glitched, fixing', emoji='🙀')
             
-            waitForImage(connect_wallet_btn_img)
+            waitForImage(Targets.connect_wallet_button)
 
         login()
 
     handleError()
 
 def handleError():
-    if positions(error_img, ct['error']) is not False:
+    if positions(Targets.error, ct['error']) is not False:
         sendTelegramPrint()
         logger('Error detected, trying to resolve', telegram=True, emoji='💥')
-        clickButton(ok_btn_img)
+        clickButton(Targets.ok_button)
         logger('Refreshing page', telegram=True, emoji='🔃')
-        # pyautogui.hotkey('ctrl', 'f5')
         pyautogui.hotkey('ctrl', 'shift', 'r')
-        waitForImage(connect_wallet_btn_img)
+        waitForImage(Targets.connect_wallet_button)
         login()
     else:
         return False
@@ -841,17 +809,16 @@ def getMoreHeroes():
 
 def checkLogout():
     if currentScreen() == "unknown" or currentScreen() == "login":
-        if positions(connect_wallet_btn_img) is not False:
+        if positions(Targets.connect_wallet_button) is not False:
             sendTelegramPrint()
             logger('Logout detected', telegram=True, emoji='😿')
             logger('Refreshing page', telegram=True, emoji='🔃')
-            # pyautogui.hotkey('ctrl', 'f5')
             pyautogui.hotkey('ctrl', 'shift', 'r')
-            waitForImage(connect_wallet_btn_img)
+            waitForImage(Targets.connect_wallet_button)
             login()
-        elif positions(sign_btn_img):
+        elif positions(Targets.metamask_sign_button):
             logger('Sing button detected', telegram=True, emoji='✔️')
-            if clickButton(metamask_cancel_button):
+            if clickButton(Targets.metamask_cancel_button):
                 logger('Metamask is glitched, fixing', telegram=True, emoji='🙀')
         else:
             return False
@@ -938,12 +905,12 @@ def main():
             getMoreHeroes()
 
         if currentScreen() == "main":
-            if clickButton(teasureHunt_icon_img):
+            if clickButton(Targets.treasure_hunt_banner):
                 logger('Entering treasure hunt', emoji='▶️')
                 last["refresh_heroes"] = now
 
         if currentScreen() == "thunt":
-            if clickButton(new_map_btn_img):
+            if clickButton(Targets.new_map_button):
                 logger('New map', emoji='🗺️')
                 last["new_map"] = now
                 sleep(1, 2)
@@ -954,7 +921,7 @@ def main():
                 sendBCoinReport()
                 
         if currentScreen() == "character":
-            clickButton(x_button_img)
+            clickButton(Targets.x_button)
             sleep(1, 3)
 
         if now - last["refresh_heroes"] > next_refresh_heroes_positions * 60:
