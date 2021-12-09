@@ -1,8 +1,10 @@
+import os
+import subprocess
+import sys
 from enum import Enum
 
 import requests
 import yaml
-import index
 
 
 class ConfigProperties(Enum):
@@ -209,17 +211,19 @@ def checkForUpdates() -> bool:
         print('Git Version: ' + lastversion)
         print('Version installed: ' + currentversion)
         if Version.isLower(currentversion.__str__(), lastversion.__str__()):
-            index.logger('New version available, please update', telegram=True, emoji='🎉')
             return True
         else:
             return False
     else:
-        index.logger('Version not found, exiting', emoji='💥')
-        return False
+        return None
 
 
 def updateApp() -> bool:
     """Updates the app
     :return: True if the app was updated, False otherwise
     """
-    return False
+    # launch the updateAssistant as a new process
+    subprocess.Popen(['python', 'updateAssistant.py'])
+
+    # close the current process, the updateAssistant will take care of the rest
+    sys.exit(0)

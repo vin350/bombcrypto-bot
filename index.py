@@ -953,22 +953,28 @@ def randomMouseMovement():
     hc.move((int(x), int(y)), np.random.randint(1, 3))
 
 
-def checkUpdates():
-    """Checks if there is an update available"""
+def checkUpdates() -> bool:
+    """Checks if there is an update available
+    :return: True if there is an update available, False otherwise"""
     # redirects to the updater module
     result = updater.checkForUpdates()
     if result:
-        updater.update()
+        logger('New version available, please update', telegram=True, emoji='🎉')
+        return True
+        # updater.updateApp() => cannot because it'll close the app in the middle of the farming process
+        # redirected only on startup, better for the user
     elif not result:
         logger('No updates available', emoji='🤷')
+        return False
     else:
-        logger('Update check failed', emoji='😿')
-        time.sleep(3)
-        exit()
+        logger('Update check failed.', emoji='😿')
+        return False
 
 
 def main():
-    checkUpdates()
+    if checkUpdates():
+        updater.updateApp()
+
     input('Press Enter to start the bot...')
     logger('Starting bot...', telegram=True, emoji='🤖')
 
