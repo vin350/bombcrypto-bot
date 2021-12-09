@@ -1,7 +1,10 @@
+import time
 from enum import Enum
 
 import requests
 import yaml
+from src.date import dateFormatted
+import index
 
 
 class ConfigProperties(Enum):
@@ -52,7 +55,7 @@ class Version:
         self.patch = int(versions[2])
 
     @staticmethod
-    def isLower(version1: str, version2: str)->bool:
+    def isLower(version1: str, version2: str) -> bool:
         """Checks if the first version is lower than the second
 
         Args:
@@ -72,6 +75,9 @@ class Version:
             return True
         else:
             return False
+
+    def __str__(self):
+        return f'{self.major}.{self.minor}.{self.patch}'
 
 
 def checkConfig() -> str:
@@ -191,11 +197,15 @@ def checkForUpdates() -> bool:
     currentversion = getAppVersion()
     lastversion = getLastAppVersion()
     if lastversion is not None:
+        print('Git Version: ' + lastversion)
+        print('Version installed: ' + currentversion)
         if Version.isLower(currentversion, lastversion):
+            index.logger('New version available, please update', telegram=True, emoji='🎉')
             return True
         else:
             return False
     else:
+        index.logger('Version not found, exiting', emoji='💥')
         return False
 
 
