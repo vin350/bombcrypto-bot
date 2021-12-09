@@ -184,7 +184,12 @@ monitor_to_use: 1
 # Valor padrão: false
 debug: False
 
-
+# [en_US] show emojis in console
+# Default value: false
+#
+# [pt_BR] mostra emojis no console 
+# Valor padrão: false
+emoji: False
 
 
 
