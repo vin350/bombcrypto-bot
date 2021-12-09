@@ -200,6 +200,6 @@ emoji: False
 # [en_US] DON'T TOUCH
 #
 # [pt_BR] NÃO MEXE
-version: "1.2.6"
+version: "1.2.9"
 configversion: "1.0.0"
 lastversionurl: "https://raw.githubusercontent.com/Agentew04/bombcrypto-bot/main/update.yaml"

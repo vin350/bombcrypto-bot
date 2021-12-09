@@ -1,9 +1,7 @@
-import time
 from enum import Enum
 
 import requests
 import yaml
-from src.date import dateFormatted
 import index
 
 
@@ -83,8 +81,9 @@ class Version:
 def checkConfig() -> str:
     """Returns the name of the property that the user
     didn't complete correctly
-    :return: the path of the property that the user didn't complete corretly,
-    if the file is empty/doesn't exist, will return "EMPTY" """
+    :return: the name of the property that the user didn't complete corretly,
+    if the file is empty/doesn't exist, will return "EMPTY"
+    and if everything is ok, will return "" """
 
     # load file
     config = getConfig()
@@ -97,6 +96,16 @@ def checkConfig() -> str:
     for essentialconfig in ConfigProperties:
         filevalue = config[essentialconfig['main']][essentialconfig['secondary']]
         # check if it's a list
+        if isinstance(essentialconfig['keyword'], list) or isinstance(filevalue, list):
+            for val in filevalue:
+                for key in essentialconfig['keyword']:
+                    if key == val:
+                        return essentialconfig['propertyName']
+        else:
+            # not a list
+            if filevalue == essentialconfig['keyword']:
+                return essentialconfig['propertyName']
+    return ""
 
 
 def isConfigComplete() -> bool:
@@ -108,7 +117,7 @@ def isConfigComplete() -> bool:
     """
 
     config = getConfig()
-    if config == {}:
+    if config != {}:
         # the file is not empty
         # check the essential parameters
         for essentialconfig in ConfigProperties:
@@ -177,7 +186,7 @@ def getLastAppVersion() -> Version:
 
 def getLastConfigVersion() -> Version:
     """Returns the last version of the config file
-    :return: the last version of the config file
+    :return: the last version of the config file or None if not found
     """
     url = getConfig()['lastversionurl']
     r = requests.get(url)
@@ -199,7 +208,7 @@ def checkForUpdates() -> bool:
     if lastversion is not None:
         print('Git Version: ' + lastversion)
         print('Version installed: ' + currentversion)
-        if Version.isLower(currentversion, lastversion):
+        if Version.isLower(currentversion.__str__(), lastversion.__str__()):
             index.logger('New version available, please update', telegram=True, emoji='🎉')
             return True
         else:
