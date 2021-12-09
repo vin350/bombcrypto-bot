@@ -772,9 +772,7 @@ def login():
         if (login_attempts > 3):
             sendTelegramPrint()
             logger('+3 login attempts, retrying', telegram=True, emoji='🔃')
-            # pyautogui.hotkey('ctrl', 'f5')
-            pyautogui.hotkey('ctrl', 'shift', 'r')
-            login_attempts = 0
+            refreshPage()
 
             if clickButton(metamask_cancel_button):
                 logger('Metamask is glitched, fixing', emoji='🙀')
@@ -790,13 +788,18 @@ def handleError():
         sendTelegramPrint()
         logger('Error detected, trying to resolve', telegram=True, emoji='💥')
         clickButton(ok_btn_img)
-        logger('Refreshing page', telegram=True, emoji='🔃')
-        # pyautogui.hotkey('ctrl', 'f5')
-        pyautogui.hotkey('ctrl', 'shift', 'r')
+        refreshPage()
         waitForImage(connect_wallet_btn_img)
         login()
     else:
         return False
+
+def refreshPage():
+    logger('Refreshing page', telegram=True, emoji='🔃')
+    if c['mac'] is True:
+        pyautogui.hotkey('command', 'shift', 'r')
+    else:
+        pyautogui.hotkey('ctrl', 'shift', 'r')
 
 def getMoreHeroes():
     global next_refresh_heroes
@@ -844,9 +847,7 @@ def checkLogout():
         if positions(connect_wallet_btn_img) is not False:
             sendTelegramPrint()
             logger('Logout detected', telegram=True, emoji='😿')
-            logger('Refreshing page', telegram=True, emoji='🔃')
-            # pyautogui.hotkey('ctrl', 'f5')
-            pyautogui.hotkey('ctrl', 'shift', 'r')
+            refreshPage()
             waitForImage(connect_wallet_btn_img)
             login()
         elif positions(sign_btn_img):

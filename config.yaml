@@ -191,6 +191,12 @@
   # Valor padrão: false
   debug: False
 
+  # [en_US] Change settings from pc to mac
+  # Default value: false
+  #
+  # [pt_BR] Modifica configurações de pc para mac
+  # Valor padrão: false
+  mac: False
 
 
 
