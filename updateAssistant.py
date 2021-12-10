@@ -85,3 +85,23 @@ if r.status_code == 200:
         else:
             print("File " + file['path'] + " is up to date")
 
+    lastversion: str = yamltext['LastAppVersion']
+
+    # find line that contains appversion
+    # opening the file in read mode
+    file = open("config.yaml", "r")
+    replacement = ""
+    # using the for loop
+    for line in file:
+        changes = ''
+        if "appversion" in line:
+            changes = f"appversion: {lastversion}\n"
+            replacement += changes
+        else:
+            replacement += line
+
+    file.close()
+    # opening the file in write mode
+    fout = open("config.yaml", "w")
+    fout.write(replacement)
+    fout.close()
