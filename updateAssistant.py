@@ -1,5 +1,7 @@
 import codecs
 import os.path
+import subprocess
+import sys
 
 import requests
 import yaml
@@ -105,3 +107,10 @@ if r.status_code == 200:
     fout = open("config.yaml", "w")
     fout.write(replacement)
     fout.close()
+
+# already updated files, try to open index.py
+subprocess.Popen(['python', 'index.py'])
+# close the assistant
+sys.exit(0)
+
+# END OF SCRIPT TO UPDATE THE CONFIG FILE HERE #

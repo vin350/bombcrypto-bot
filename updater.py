@@ -226,5 +226,5 @@ def updateApp() -> bool:
     subprocess.Popen(['python', 'updateAssistant.py'])
 
     # close the current process, the updateAssistant will take care of the rest
-    sys.exit(69)
+    sys.exit(0)
 
