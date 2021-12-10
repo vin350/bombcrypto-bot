@@ -165,7 +165,7 @@ def getAppVersion() -> Version:
     :return: the version of the app
     """
     config = getConfig()
-    strversion = config['version']
+    strversion = config['appversion']
     version = Version(strversion)
     return version
 
@@ -180,7 +180,7 @@ def getLastAppVersion() -> Version:
     if r.status_code == 200:
         strversion = r.text
         lastversion = yaml.safe_load(strversion)
-        lastappversion = Version(lastversion['version'])
+        lastappversion = Version(lastversion['LastAppVersion'])
         return lastappversion
     else:
         return None
@@ -195,7 +195,7 @@ def getLastConfigVersion() -> Version:
     if r.status_code == 200:
         strversion = r.text
         lastversion = yaml.safe_load(strversion)
-        lastconfigversion = Version(lastversion['configversion'])
+        lastconfigversion = Version(lastversion['LastConfigVersion'])
         return lastconfigversion
     else:
         return None
@@ -208,8 +208,8 @@ def checkForUpdates() -> bool:
     currentversion = getAppVersion()
     lastversion = getLastAppVersion()
     if lastversion is not None:
-        print('Git Version: ' + lastversion)
-        print('Version installed: ' + currentversion)
+        print('Git Version: ' + lastversion.__str__())
+        print('Version installed: ' + currentversion.__str__())
         if Version.isLower(currentversion.__str__(), lastversion.__str__()):
             return True
         else:
@@ -226,4 +226,5 @@ def updateApp() -> bool:
     subprocess.Popen(['python', 'updateAssistant.py'])
 
     # close the current process, the updateAssistant will take care of the rest
-    sys.exit(0)
+    sys.exit(69)
+
