@@ -13,9 +13,43 @@ import time
 import sys
 import yaml
 import random
-import requests
+import updater
 
 # TODO: add kill bot on button pressed, server maintenance, auto update com os valores anteriores da config
+
+
+# this logger is up here because PyCharm was complaining about it being after
+def logger(message, telegram=False, emoji=None) -> bool:
+    """Displays a message in the console or in the Telegram chat
+    :param message: The message to display
+    :param telegram: If True, the message will be sent to the Telegram chat
+    :param emoji: The emoji to display in the message
+    :return: Always return True(IDK why)
+    """
+    if emoji is None:
+        print(message)
+    else:
+        print(f"{emoji} {message}")
+
+    if telegram:
+        updater.sendMessage(message, emoji)
+    formatted_datetime = dateFormatted()
+    console_message = "{} - {}".format(formatted_datetime, message)
+    service_message = "⏰{}\n{} {}".format(formatted_datetime, emoji, message)
+    if emoji is not None and c['emoji'] is True:
+        console_message = "{} - {} {}".format(formatted_datetime, emoji, message)
+
+    print(console_message)
+
+    if telegram:
+        sendTelegramMessage(service_message)
+
+    if c['save_log_to_file']:
+        logger_file = open("./logs/logger.log", "a", encoding='utf-8')
+        logger_file.write(console_message + '\n')
+        logger_file.close()
+    return True
+
 
 banner = """
 ===========================================================
@@ -42,9 +76,9 @@ banner = """
 
 print(banner)
 
-
-stream = open("config.yaml", 'r')
-if stream is not None:
+if updater.ConfigChecker.isConfigComplete():
+    # config is complete, get all data from config
+    stream = open("config.yaml", 'r')
     c = yaml.safe_load(stream)
     ct = c['threshold']
     t = c['time_intervals']
@@ -54,27 +88,17 @@ if stream is not None:
     offsets = c['offsets']
     stream.close()
 else:
-    logger('Config file not found, exiting', emoji='😿')
-    time.sleep(3)
-    exit()
-
-def logger(message, telegram=False, emoji=None):
-    formatted_datetime = dateFormatted()
-    console_message = "{} - {}".format(formatted_datetime, message)
-    service_message = "⏰{}\n{} {}".format(formatted_datetime, emoji, message)
-    if emoji is not None and c['emoji'] is True:
-        console_message = "{} - {} {}".format(formatted_datetime, emoji, message)
-
-    print(console_message)
-
-    if telegram == True:
-        sendTelegramMessage(service_message)
-
-    if (c['save_log_to_file'] == True):
-        logger_file = open("./logs/logger.log", "a", encoding='utf-8')
-        logger_file.write(console_message + '\n')
-        logger_file.close()
-    return True
+    # check what is missing
+    missing_config = updater.ConfigChecker.checkConfig()
+    if missing_config == "EMPTY":
+        logger("Config file not found. Exiting.")
+        time.sleep(3)
+        exit()
+    else:
+        # file exists but is incomplete, check and notify user
+        logger(f"You must enter a valid value for {updater.checkConfig()} in the configuration files")
+        time.sleep(3)
+        exit()
 
 
 hc = HumanClicker()
@@ -119,12 +143,13 @@ chest3 = cv2.imread('./images/targets/chest3.png')
 chest4 = cv2.imread('./images/targets/chest4.png')
 
 # Initialize telegram
-if telegram_data['telegram_mode'] == True:
+if telegram_data['telegram_mode']:
     logger('Initializing Telegram...', emoji='📱')
-    updater = Updater(telegram_data["telegram_bot_key"])
+    TelegramUpdater = Updater(telegram_data["telegram_bot_key"])
 
     try:
         TBot = telegram.Bot(token=telegram_data["telegram_bot_key"])
+
 
         def send_print(update: Update, context: CallbackContext) -> None:
             update.message.reply_text('🔃 Proccessing...')
@@ -132,18 +157,22 @@ if telegram_data['telegram_mode'] == True:
             cv2.imwrite('./logs/print-report.%s' % telegram_data["format_of_images"], screenshot)
             update.message.reply_photo(photo=open('./logs/print-report.%s' % telegram_data["format_of_images"], 'rb'))
 
+
         def send_id(update: Update, context: CallbackContext) -> None:
             update.message.reply_text(f'🆔 Your id is: {update.effective_user.id}')
+
 
         def send_map(update: Update, context: CallbackContext) -> None:
             update.message.reply_text('🔃 Proccessing...')
             if sendMapReport() is None:
                 update.message.reply_text('😿 An error has occurred')
 
+
         def send_bcoin(update: Update, context: CallbackContext) -> None:
             update.message.reply_text('🔃 Proccessing...')
             if sendBCoinReport() is None:
                 update.message.reply_text('😿 An error has occurred')
+
 
         commands = [
             ['print', send_print],
@@ -153,43 +182,47 @@ if telegram_data['telegram_mode'] == True:
         ]
 
         for command in commands:
-            updater.dispatcher.add_handler(CommandHandler(command[0], command[1]))
+            TelegramUpdater.dispatcher.add_handler(CommandHandler(command[0], command[1]))
 
-        updater.start_polling()
-        # updater.idle()
+        TelegramUpdater.start_polling()
+        # TelegramUpdater.idle()
     except:
         logger('Bot not initialized, see configuration file', emoji='🤖')
 
+
 def sendTelegramMessage(message):
-    if telegram_data['telegram_mode'] == False:
+    if not telegram_data['telegram_mode']:
         return
     try:
-        if(len(telegram_data["telegram_chat_id"]) > 0):
+        if (len(telegram_data["telegram_chat_id"]) > 0):
             for chat_id in telegram_data["telegram_chat_id"]:
                 TBot.send_message(text=message, chat_id=chat_id)
     except:
         logger('Error to send telegram message. See configuration file', emoji='📄')
 
+
 def sendTelegramPrint():
     if telegram_data['telegram_mode'] == False:
         return
     try:
-        if(len(telegram_data["telegram_chat_id"]) > 0):
+        if (len(telegram_data["telegram_chat_id"]) > 0):
             screenshot = printScreen()
             cv2.imwrite('./logs/print-report.%s' % telegram_data["format_of_images"], screenshot)
             for chat_id in telegram_data["telegram_chat_id"]:
-                TBot.send_photo(chat_id=chat_id, photo=open('./logs/print-report.%s' % telegram_data["format_of_images"], 'rb'))
+                TBot.send_photo(chat_id=chat_id,
+                                photo=open('./logs/print-report.%s' % telegram_data["format_of_images"], 'rb'))
     except:
         logger('Error to send telegram message. See configuration file', emoji='📄')
 
+
 def sendPossibleAmountReport(baseImage):
-    if telegram_data['telegram_mode'] == False:
+    if not telegram_data['telegram_mode']:
         return
     c1 = len(positions(chest1, ct['chest'], baseImage, True))
     c2 = len(positions(chest2, ct['chest'], baseImage, True))
     c3 = len(positions(chest3, ct['chest'], baseImage, True))
     c4 = len(positions(chest4, ct['chest'], baseImage, True))
-    
+
     value1 = c1 * chest_data["value_chest1"]
     value2 = c2 * chest_data["value_chest2"]
     value3 = c3 * chest_data["value_chest3"]
@@ -199,19 +232,20 @@ def sendPossibleAmountReport(baseImage):
 
     report = """
 Possible quantity chest per type:
-🟤 - """+str(c1)+"""
-🟣 - """+str(c2)+"""
-🟡 - """+str(c3)+"""
-🔵 - """+str(c4)+"""
+🟤 - """ + str(c1) + """
+🟣 - """ + str(c2) + """
+🟡 - """ + str(c3) + """
+🔵 - """ + str(c4) + """
 
-🤑 Possible amount: """+f'{total:.3f} BCoin'+"""
+🤑 Possible amount: """ + f'{total:.3f} BCoin' + """
 """
     logger(report, telegram=True)
 
+
 def sendBCoinReport():
-    if telegram_data['telegram_mode'] == False:
+    if not telegram_data['telegram_mode']:
         return
-    if(len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_coin_report"] is False):
+    if len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_coin_report"] is False:
         return
 
     if currentScreen() == "main":
@@ -226,7 +260,7 @@ def sendBCoinReport():
         time.sleep(2)
     else:
         return
-        
+
     clickButton(chest_button)
 
     sleep(5, 15)
@@ -237,23 +271,25 @@ def sendBCoinReport():
 
         with mss.mss() as sct:
             sct_img = np.array(sct.grab(sct.monitors[c['monitor_to_use']]))
-            crop_img = sct_img[y:y+h, x:x+w]
+            crop_img = sct_img[y:y + h, x:x + w]
             cv2.imwrite('./logs/bcoin-report.%s' % telegram_data["format_of_images"], crop_img)
             time.sleep(1)
             try:
                 for chat_id in telegram_data["telegram_chat_id"]:
                     # TBot.send_document(chat_id=chat_id, document=open('bcoin-report.png', 'rb'))
-                    TBot.send_photo(chat_id=chat_id, photo=open('./logs/bcoin-report.%s' % telegram_data["format_of_images"], 'rb'))
+                    TBot.send_photo(chat_id=chat_id,
+                                    photo=open('./logs/bcoin-report.%s' % telegram_data["format_of_images"], 'rb'))
             except:
                 logger('Telegram offline', emoji='😿')
     clickButton(x_button_img)
     logger('BCoin report sent', telegram=True, emoji='📄')
     return True
 
+
 def sendMapReport():
-    if telegram_data['telegram_mode'] == False:
+    if not telegram_data['telegram_mode']:
         return
-    if(len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_map_report"] is False):
+    if len(telegram_data["telegram_chat_id"]) <= 0 or telegram_data["enable_map_report"] is False:
         return
 
     if currentScreen() == "main":
@@ -290,12 +326,13 @@ def sendMapReport():
         try:
             for chat_id in telegram_data["telegram_chat_id"]:
                 # TBot.send_document(chat_id=chat_id, document=open('map-report.png', 'rb'))
-                TBot.send_photo(chat_id=chat_id, photo=open('./logs/map-report.%s' % telegram_data["format_of_images"], 'rb'))
+                TBot.send_photo(chat_id=chat_id,
+                                photo=open('./logs/map-report.%s' % telegram_data["format_of_images"], 'rb'))
         except:
             logger('Telegram offline', emoji='😿')
 
         try:
-            sendPossibleAmountReport(sct_img[:,:,:3])
+            sendPossibleAmountReport(sct_img[:, :, :3])
         except:
             logger('Error finding chests', telegram=True, emoji='😿')
 
@@ -303,16 +340,17 @@ def sendMapReport():
     logger('Map report sent', telegram=True, emoji='📄')
     return True
 
-def clickButton(img,name=None, timeout=3, threshold = ct['default']):
+
+def clickButton(img, name=None, timeout=3, threshold=ct['default']):
     if not name is None:
         pass
     start = time.time()
     clicked = False
-    while(not clicked):
+    while not clicked:
         matches = positions(img, threshold=threshold)
-        if(matches is False):
-            hast_timed_out = time.time()-start > timeout
-            if(hast_timed_out):
+        if matches is False:
+            hast_timed_out = time.time() - start > timeout
+            if hast_timed_out:
                 if not name is None:
                     pass
                     # print('timed out')
@@ -320,19 +358,21 @@ def clickButton(img,name=None, timeout=3, threshold = ct['default']):
             # print('button not found yet')
             continue
 
-        x,y,w,h = matches[0]
+        x, y, w, h = matches[0]
         # pyautogui.moveTo(x+(w/2),y+(h/2),1)
         # pyautogui.moveTo(int(random.uniform(x, x+w)),int(random.uniform(y, y+h)),1)
-        hc.move((int(random.uniform(x, x+w)), int(random.uniform(y, y+h))),1)
+        hc.move((int(random.uniform(x, x + w)), int(random.uniform(y, y + h))), 1)
         pyautogui.click()
         return True
+
 
 def printScreen():
     with mss.mss() as sct:
         # The screen part to capture
         # Grab the data
         sct_img = np.array(sct.grab(sct.monitors[c['monitor_to_use']]))
-        return sct_img[:,:,:3]
+        return sct_img[:, :, :3]
+
 
 def positions(target, threshold=ct['default'], base_img=None, return_0=False):
     if base_img is None:
@@ -346,7 +386,6 @@ def positions(target, threshold=ct['default'], base_img=None, return_0=False):
     result = cv2.matchTemplate(img, target, cv2.TM_CCOEFF_NORMED)
 
     yloc, xloc = np.where(result >= threshold)
-
 
     rectangles = []
     for (x, y) in zip(xloc, yloc):
@@ -363,23 +402,22 @@ def positions(target, threshold=ct['default'], base_img=None, return_0=False):
     else:
         return rectangles
 
+
 def findPuzzlePieces(result, piece_img, threshold=0.5):
     piece_w = piece_img.shape[1]
     piece_h = piece_img.shape[0]
     yloc, xloc = np.where(result >= threshold)
 
-
-    r= []
+    r = []
     for (piece_x, piece_y) in zip(xloc, yloc):
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
         r.append([int(piece_x), int(piece_y), int(piece_w), int(piece_h)])
-
 
     r, weights = cv2.groupRectangles(r, 1, 0.2)
 
     if len(r) < 2:
         # print('threshold = %.3f' % threshold)
-        return findPuzzlePieces(result, piece_img,threshold-0.01)
+        return findPuzzlePieces(result, piece_img, threshold - 0.01)
 
     if len(r) == 2:
         # print('match')
@@ -389,6 +427,7 @@ def findPuzzlePieces(result, piece_img, threshold=0.5):
         # logger('🧩 Overshoot by %d attempts' % len(r))
 
         return r
+
 
 def getRightPiece(puzzle_pieces):
     if puzzle_pieces is False:
@@ -400,6 +439,7 @@ def getRightPiece(puzzle_pieces):
     right_piece = puzzle_pieces[index_of_right_rectangle]
     return right_piece
 
+
 def getLeftPiece(puzzle_pieces):
     if puzzle_pieces is False:
         return False
@@ -410,21 +450,22 @@ def getLeftPiece(puzzle_pieces):
     left_piece = puzzle_pieces[index_of_left_rectangle]
     return left_piece
 
-def show(rectangles = None, img = None):
 
+def show(rectangles=None, img=None):
     if img is None:
         with mss.mss() as sct:
             img = np.array(sct.grab(sct.monitors[c['monitor_to_use']]))
 
     if rectangles is not None:
         for (x, y, w, h) in rectangles:
-            cv2.rectangle(img, (x, y), (x + w, y + h), (255,255,255,255), 2)
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255, 255), 2)
 
     # cv2.rectangle(img, (result[0], result[1]), (result[0] + result[2], result[1] + result[3]), (255,50,255), 2)
-    cv2.imshow('img',img)
+    cv2.imshow('img', img)
     cv2.waitKey(0)
 
-def getPiecesPosition(t = 150):
+
+def getPiecesPosition(t=150):
     popup_pos = positions(robot)
     if popup_pos is False:
         logger('Captcha not found', emoji='🧩')
@@ -440,11 +481,11 @@ def getPiecesPosition(t = 150):
     x = rx + x_offset
 
     img = printScreen()
-    #TODO tirar um poco de cima
+    # TODO tirar um poco de cima
 
-    cropped = img[ y : y + h , x: x + w]
+    cropped = img[y: y + h, x: x + w]
     blurred = cv2.GaussianBlur(cropped, (3, 3), 0)
-    edges = cv2.Canny(blurred, threshold1=t/2, threshold2=t,L2gradient=True)
+    edges = cv2.Canny(blurred, threshold1=t / 2, threshold2=t, L2gradient=True)
     # img = cv2.Laplacian(img,cv2.CV_64F)
 
     # gray_piece_img = cv2.cvtColor(piece, cv2.COLOR_BGR2GRAY)
@@ -455,7 +496,7 @@ def getPiecesPosition(t = 150):
     # print('----')
     # piece_img = cv2.Canny(gray_piece_img, threshold1=t/2, threshold2=t,L2gradient=True)
     # result = cv2.matchTemplate(edges,piece_img,cv2.TM_CCOEFF_NORMED)
-    result = cv2.matchTemplate(edges,piece_img,cv2.TM_CCORR_NORMED)
+    result = cv2.matchTemplate(edges, piece_img, cv2.TM_CCORR_NORMED)
 
     puzzle_pieces = findPuzzlePieces(result, piece_img)
 
@@ -468,19 +509,21 @@ def getPiecesPosition(t = 150):
     absolute_puzzle_pieces = []
     for i, puzzle_piece in enumerate(puzzle_pieces):
         px, py, pw, ph = puzzle_piece
-        absolute_puzzle_pieces.append( [ x + px, y + py, pw, ph])
+        absolute_puzzle_pieces.append([x + px, y + py, pw, ph])
 
     absolute_puzzle_pieces = np.array(absolute_puzzle_pieces)
     # show(absolute_puzzle_pieces)
     return absolute_puzzle_pieces
+
 
 def getSliderPosition():
     slider_pos = positions(slider)
     if slider_pos is False:
         return False
     x, y, w, h = slider_pos[0]
-    position = [x+w/2,y+h/2]
+    position = [x + w / 2, y + h / 2]
     return position
+
 
 def checkCaptcha():
     puzzle_pos = positions(robot)
@@ -488,6 +531,7 @@ def checkCaptcha():
         solveCaptcha()
     else:
         return True
+
 
 def solveCaptcha():
     pieces_start_pos = getPiecesPosition()
@@ -497,22 +541,22 @@ def solveCaptcha():
     if slider_start_pos is False:
         return
 
-    x,y = slider_start_pos
+    x, y = slider_start_pos
     # pyautogui.moveTo(x,y,1)
-    hc.move((int(x),int(y)), np.random.randint(1,2))
+    hc.move((int(x), int(y)), np.random.randint(1, 2))
     pyautogui.mouseDown()
     # pyautogui.moveTo(x+300 ,y,0.5)
-    hc.move((int(x + 350),int(y)), np.random.randint(1,2))
+    hc.move((int(x + 350), int(y)), np.random.randint(1, 2))
     pieces_end_pos = getPiecesPosition()
     if pieces_end_pos is False:
         return False
 
     piece_start, _, _, _ = getLeftPiece(pieces_start_pos)
     piece_end, _, _, _ = getRightPiece(pieces_end_pos)
-    piece_middle, _, _, _  = getRightPiece(pieces_start_pos)
+    piece_middle, _, _, _ = getRightPiece(pieces_start_pos)
     slider_start, _, = slider_start_pos
     slider_end, _ = getSliderPosition()
-    
+
     # print(piece_start)
     # print(piece_end)
     # print(piece_middle)
@@ -523,7 +567,7 @@ def solveCaptcha():
         return False
 
     piece_domain = piece_end - piece_start
-    middle_piece_in_percent = (piece_middle - piece_start)/piece_domain
+    middle_piece_in_percent = (piece_middle - piece_start) / piece_domain
     # print('middle_piece_in_percent{} '.format(middle_piece_in_percent ))
 
     slider_domain = slider_end - slider_start
@@ -531,7 +575,7 @@ def solveCaptcha():
     # arr = np.array([[int(piece_start),int(y-20),int(10),int(10)],[int(piece_middle),int(y-20),int(10),int(10)],[int(piece_end-20),int(y),int(10),int(10)],[int(slider_awnser),int(y),int(20),int(20)]])
 
     # pyautogui.moveTo(slider_awnser,y,0.5)
-    hc.move((int(slider_awnser),int(y)), np.random.randint(1,2))
+    hc.move((int(slider_awnser), int(y)), np.random.randint(1, 2))
     time.sleep(1)
     pyautogui.mouseUp()
     time.sleep(2)
@@ -545,10 +589,11 @@ def solveCaptcha():
 
     # show(arr)
 
+
 def scroll():
     offset = offsets['character_indicator']
     offset_random = random.uniform(offset[0], offset[1])
-    
+
     # width, height = pyautogui.size()
     # pyautogui.moveTo(width/2-200, height/2,1)
     character_indicator_pos = positions(character_indicator)
@@ -556,7 +601,7 @@ def scroll():
         return
 
     x, y, w, h = character_indicator_pos[0]
-    hc.move((int(x+(w/2)),int(y+h+offset_random)), np.random.randint(1,2))
+    hc.move((int(x + (w / 2)), int(y + h + offset_random)), np.random.randint(1, 2))
 
     if not c['use_click_and_drag_instead_of_scroll']:
         pyautogui.click()
@@ -564,8 +609,9 @@ def scroll():
     else:
         # pyautogui.dragRel(0,-c['click_and_drag_amount'],duration=1, button='left')
         pyautogui.mouseDown(button='left')
-        hc.move((int(x),int(y+(-c['click_and_drag_amount']))), np.random.randint(1,2))
+        hc.move((int(x), int(y + (-c['click_and_drag_amount']))), np.random.randint(1, 2))
         pyautogui.mouseUp(button='left')
+
 
 def clickButtons():
     buttons = positions(go_work_img, threshold=ct['go_to_work_btn'])
@@ -580,12 +626,12 @@ def clickButtons():
     for (x, y, w, h) in buttons:
         offset_random = random.uniform(offset[0], offset[1])
         # pyautogui.moveTo(x+(w/2),y+(h/2),1)
-        hc.move((int(x+offset_random),int(y+(h/2))), np.random.randint(1,2))
+        hc.move((int(x + offset_random), int(y + (h / 2))), np.random.randint(1, 2))
         pyautogui.click()
         global heroes_clicked_total
         global heroes_clicked
         heroes_clicked_total = heroes_clicked_total + 1
-        #cv2.rectangle(sct_img, (x, y) , (x + w, y + h), (0,255,255),2)
+        # cv2.rectangle(sct_img, (x, y) , (x + w, y + h), (0,255,255),2)
         if heroes_clicked > 15:
             logger('Too many hero clicks, try to increase the go_to_work_btn threshold', telegram=True, emoji='⚠️')
             return
@@ -593,15 +639,17 @@ def clickButtons():
     logger('Clicking in %d heroes detected.' % len(buttons), telegram=True, emoji='👆')
     return len(buttons)
 
+
 def isWorking(bar, buttons):
     y = bar[1]
 
-    for (_,button_y,_,button_h) in buttons:
+    for (_, button_y, _, button_h) in buttons:
         isBelow = y < (button_y + button_h)
         isAbove = y > (button_y - button_h)
         if isBelow and isAbove:
             return False
     return True
+
 
 def clickGreenBarButtons():
     offset = offsets['work_button']
@@ -620,14 +668,15 @@ def clickGreenBarButtons():
         if not isWorking(bar, buttons):
             not_working_green_bars.append(bar)
     if len(not_working_green_bars) > 0:
-        logger('Clicking in %d heroes with green bar detected.' % len(not_working_green_bars), telegram=True, emoji='👆')
+        logger('Clicking in %d heroes with green bar detected.' % len(not_working_green_bars), telegram=True,
+               emoji='👆')
 
     # se tiver botao com y maior que bar y-10 e menor que y+10
     for (x, y, w, h) in not_working_green_bars:
         offset_random = random.uniform(offset[0], offset[1])
         # isWorking(y, buttons)
         # pyautogui.moveTo(x+offset+(w/2),y+(h/2),1)
-        hc.move((int(x+offset_random+(w/2)),int(y+(h/2))), np.random.randint(1,2))
+        hc.move((int(x + offset_random + (w / 2)), int(y + (h / 2))), np.random.randint(1, 2))
         pyautogui.click()
         global heroes_clicked_total
         global heroes_clicked
@@ -635,9 +684,10 @@ def clickGreenBarButtons():
         if heroes_clicked > 15:
             logger('Too many hero clicks, try to increase the go_to_work_btn threshold', telegram=True, emoji='⚠️')
             return
-        #cv2.rectangle(sct_img, (x, y) , (x + w, y + h), (0,255,255),2)
+        # cv2.rectangle(sct_img, (x, y) , (x + w, y + h), (0,255,255),2)
         sleep(1, 3)
     return len(not_working_green_bars)
+
 
 def clickFullBarButtons():
     offset = offsets['work_button_full']
@@ -662,7 +712,7 @@ def clickFullBarButtons():
     for (x, y, w, h) in not_working_full_bars:
         offset_random = random.uniform(offset[0], offset[1])
         # pyautogui.moveTo(x+offset+(w/2),y+(h/2),1)
-        hc.move((int(x+offset_random+(w/2)),int(y+(h/2))), np.random.randint(1,2))
+        hc.move((int(x + offset_random + (w / 2)), int(y + (h / 2))), np.random.randint(1, 2))
         pyautogui.click()
         global heroes_clicked_total
         global heroes_clicked
@@ -672,6 +722,7 @@ def clickFullBarButtons():
             return
         sleep(1, 3)
     return len(not_working_full_bars)
+
 
 def currentScreen():
     if positions(arrow_img) is not False:
@@ -690,6 +741,7 @@ def currentScreen():
         # sys.stdout.write("\nUnknown. ")
         return "unknown"
 
+
 def goToHeroes():
     if currentScreen() == "thunt":
         if clickButton(arrow_img):
@@ -706,6 +758,7 @@ def goToHeroes():
     if currentScreen() == "unknown" or currentScreen() == "login":
         checkLogout()
 
+
 def goToTreasureHunt():
     if currentScreen() == "main":
         clickButton(teasureHunt_icon_img)
@@ -715,6 +768,7 @@ def goToTreasureHunt():
             clickButton(teasureHunt_icon_img)
     if currentScreen() == "unknown" or currentScreen() == "login":
         checkLogout()
+
 
 def refreshHeroesPositions():
     logger('Refreshing heroes positions', emoji='🔃')
@@ -731,6 +785,7 @@ def refreshHeroesPositions():
     else:
         return False
 
+
 def login():
     global login_attempts
 
@@ -744,7 +799,7 @@ def login():
 
     metamask_unlock_coord = positions(metamask_unlock_img)
     if metamask_unlock_coord is not False:
-        if(metamask_data["enable_login_metamask"] is False):
+        if metamask_data["enable_login_metamask"] is False:
             logger('Metamask locked! But login with password is disabled, exiting', emoji='🔒')
             exit()
         logger('Found unlock button. Waiting for password', emoji='🔓')
@@ -757,7 +812,7 @@ def login():
     if clickButton(sign_btn_img):
         logger('Found sign button. Waiting to check if logged in', emoji='✔️')
         time.sleep(5)
-        if clickButton(sign_btn_img): ## twice because metamask glitch
+        if clickButton(sign_btn_img):  ## twice because metamask glitch
             logger('Found glitched sign button. Waiting to check if logged in', emoji='✔️')
         # time.sleep(25)
         waitForImage(teasureHunt_icon_img, timeout=60)
@@ -769,7 +824,7 @@ def login():
         logger('Login failed, trying again', emoji='😿')
         login_attempts += 1
 
-        if (login_attempts > 3):
+        if login_attempts > 3:
             sendTelegramPrint()
             logger('+3 login attempts, retrying', telegram=True, emoji='🔃')
             # pyautogui.hotkey('ctrl', 'f5')
@@ -778,12 +833,13 @@ def login():
 
             if clickButton(metamask_cancel_button):
                 logger('Metamask is glitched, fixing', emoji='🙀')
-            
+
             waitForImage(connect_wallet_btn_img)
 
         login()
 
     handleError()
+
 
 def handleError():
     if positions(error_img, ct['error']) is not False:
@@ -797,6 +853,7 @@ def handleError():
         login()
     else:
         return False
+
 
 def getMoreHeroes():
     global next_refresh_heroes
@@ -818,7 +875,7 @@ def getMoreHeroes():
     empty_scrolls_attempts = c['scroll_attempts']
     next_refresh_heroes = random.uniform(t['send_heroes_for_work'][0], t['send_heroes_for_work'][1])
 
-    while(empty_scrolls_attempts > 0):
+    while (empty_scrolls_attempts > 0):
         if c['select_heroes_mode'] == 'full':
             buttonsClicked = clickFullBarButtons()
             if buttonsClicked is not None:
@@ -839,6 +896,7 @@ def getMoreHeroes():
     logger('{} total heroes sent since the bot started'.format(heroes_clicked_total), telegram=True, emoji='🦸')
     goToTreasureHunt()
 
+
 def checkLogout():
     if currentScreen() == "unknown" or currentScreen() == "login":
         if positions(connect_wallet_btn_img) is not False:
@@ -855,9 +913,10 @@ def checkLogout():
                 logger('Metamask is glitched, fixing', telegram=True, emoji='🙀')
         else:
             return False
-            
+
     else:
         return False
+
 
 def waitForImage(imgs, timeout=30, threshold=0.5, multiple=False):
     start = time.time()
@@ -866,7 +925,7 @@ def waitForImage(imgs, timeout=30, threshold=0.5, multiple=False):
             for img in imgs:
                 matches = positions(img, threshold=threshold)
                 if matches is False:
-                    hast_timed_out = time.time()-start > timeout
+                    hast_timed_out = time.time() - start > timeout
                     if hast_timed_out is not False:
                         return False
                     continue
@@ -874,58 +933,63 @@ def waitForImage(imgs, timeout=30, threshold=0.5, multiple=False):
         else:
             matches = positions(imgs, threshold=threshold)
             if matches is False:
-                hast_timed_out = time.time()-start > timeout
+                hast_timed_out = time.time() - start > timeout
                 if hast_timed_out is not False:
                     return False
                 continue
             return True
 
+
 def sleep(min, max):
-	sleep = random.uniform(min,max)
-	randomMouseMovement()
-	return time.sleep(sleep)
+    sleep = random.uniform(min, max)
+    randomMouseMovement()
+    return time.sleep(sleep)
+
 
 def randomMouseMovement():
     x, y = pyautogui.size()
     x = np.random.randint(0, x)
     y = np.random.randint(0, y)
-    hc.move((int(x), int(y)), np.random.randint(1,3))
+    hc.move((int(x), int(y)), np.random.randint(1, 3))
 
-def checkUpdates():
-    data = requests.get('https://raw.githubusercontent.com/vin350/bombcrypto-bot/main/config.yaml')
 
-    if data is not None:
-        v = yaml.safe_load(data.text)
-        version = v['version']
-        data.close()
-    else:
-        logger('Version not found, exiting', emoji='💥')
-        time.sleep(3)
-        exit()
-
-    print('Git Version: ' + version)
-    print('Version installed: ' + c['version'])
-    if version > c['version']:
+def checkUpdates() -> bool:
+    """Checks if there is an update available
+    :return: True if there is an update available, False otherwise"""
+    # redirects to the updater module
+    result = updater.checkForUpdates()
+    if result:
         logger('New version available, please update', telegram=True, emoji='🎉')
+        return True
+        # updater.updateApp() => cannot because it'll close the app in the middle of the farming process
+        # redirected only on startup, better for the user
+    elif not result:
+        logger('No updates available', emoji='🤷')
+        return False
+    else:
+        logger('Update check failed.', emoji='😿')
+        return False
 
 
 def main():
-    checkUpdates()
+    if checkUpdates():
+        updater.updateApp()
+
     input('Press Enter to start the bot...')
     logger('Starting bot...', telegram=True, emoji='🤖')
 
     last = {
-        "login" : 0,
-        "heroes" : 0,
-        "new_map" : 0,
-        "refresh_heroes" : 0,
-        "check_updates" : 0
+        "login": 0,
+        "heroes": 0,
+        "new_map": 0,
+        "refresh_heroes": 0,
+        "check_updates": 0
     }
 
     while True:
         if currentScreen() == "login":
             login()
-        
+
         handleError()
 
         checkCaptcha()
@@ -952,7 +1016,7 @@ def main():
                 sendMapReport()
                 sleep(3, 5)
                 sendBCoinReport()
-                
+
         if currentScreen() == "character":
             clickButton(x_button_img)
             sleep(1, 3)
@@ -969,10 +1033,11 @@ def main():
         sys.stdout.flush()
         time.sleep(general_check_time)
 
+
 if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
         logger('Shutting down the bot', telegram=True, emoji='😓')
-        updater.stop()
+        TelegramUpdater.stop()
         exit()

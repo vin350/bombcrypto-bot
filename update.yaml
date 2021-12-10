@@ -1,0 +1,23 @@
+# when adding a new file, add it to the list of files to be updated
+# and leave the md5 value empty. Then execute the calcmd5.py script
+# to calculate the md5 sum of all files and update them in the config
+# add the like this
+# files:
+#   - path: ./path/to/file
+#   - md5: <----Leave this empty!
+
+# config.yaml doesn't need to go here! It has its own versioning and
+# uses a special function to not lose data in case of an update
+
+# all paths are relative to calcmd5.py !!!! it will not work it's anywhere else
+# ./ means the root folder of the repo
+
+LastAppVersion: 1.2.9
+LastConfigVersion: 1.0.1
+files:
+- md5: b89fb4c2af4f369ac6ef23ce450b3758
+  path: ./index.py
+- md5: 06c37b9e6bea80d54e7604a70a1687f1
+  path: ./updater.py
+- md5: 16c6780b896afa5f9d3f4f5d535917b0
+  path: ./requirements.txt
